@@ -4,6 +4,9 @@ public class PlayerCharBattleController : MonoBehaviour
 {
     public int health;
 
+    public Transform bossLocation;
+
+
     public Transform firePoint;
     public GameObject BulletPrefab;
     public float bulletSpeed;
@@ -23,7 +26,13 @@ public class PlayerCharBattleController : MonoBehaviour
         
         if(bulletScript != null)
         {
-            bulletScript.Initialize(firePoint.forward, bulletSpeed);
+            // let's shoot bullets left/right based on the camera.
+            Camera cam = Camera.main;
+            Vector3 camRight = cam.transform.right;
+
+            float howSimilarIsFireForwardToCameraRight = Vector3.Dot(camRight, firePoint.forward);
+
+            bulletScript.Initialize(camRight * Mathf.Sign(howSimilarIsFireForwardToCameraRight), bulletSpeed);
         }
 
 

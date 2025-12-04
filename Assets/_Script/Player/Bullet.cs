@@ -19,9 +19,18 @@ public class Bullet : MonoBehaviour
 
         transform.position += _direction * _speed * Time.deltaTime; //bulletMoving
 
+        Camera cam = Camera.main;
+        // this method would have worked for perspective projection
+        //Vector3 fromCameraThroughBulletDirection = (transform.position - cam.transform.position).normalized;
+       
+        Vector3 camDir = cam.transform.forward;
+
+        Debug.DrawRay(transform.position, camDir * 50.0f, Color.red, 5.0f);
+
         RaycastHit hit;
-        if(Physics.Raycast(transform.position, _direction, out hit, _speed * Time.deltaTime))
+        if(Physics.Raycast(transform.position, camDir, out hit, _speed * Time.deltaTime))
         {
+            //Coroutine to wait until the end of the stuff? 
             OnHit(hit);
         }
 
@@ -42,6 +51,7 @@ public class Bullet : MonoBehaviour
 
         Platform platform = hit.collider.GetComponent<Platform>();
         BossManager bossManager = hit.collider.gameObject.GetComponent<BossManager>();
+        Stitch stitch = hit.collider.gameObject.GetComponent<Stitch>();
 
         if(platform != null)
         {
@@ -51,12 +61,19 @@ public class Bullet : MonoBehaviour
 
         if (bossManager != null)
         {
-            //Hit the boss (Phase One = not very effective)
+            //Hit the boss (Phase One = No hit)
         }
 
-        //if stitch, it will do something.
+        if(stitch != null)
+        {
+            //if stitch, it will do something.
+
+        }
+
 
         Destroy(gameObject, 0.5f);
     }
+
+    //
 
 }

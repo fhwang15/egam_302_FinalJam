@@ -18,7 +18,7 @@ public class InputHandler : MonoBehaviour
         _jumpAction.performed += OnJumpPerformed;
 
         // Maybe visible in the future when Proper "Look" is implemented
-        Cursor.visible = false;
+        //Cursor.visible = false;
     }
 
     // Update is called once per frame
