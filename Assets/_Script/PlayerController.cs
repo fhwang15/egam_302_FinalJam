@@ -3,16 +3,21 @@ using UnityEngine;
 public class PlayerController : MonoBehaviour
 {
     private CharacterController _characterController;
-    public float MovementSpeed;
-    public float RotationSpeed;
-    public float JumpForce;
+    public float MovementSpeed; // A/D moving
+    public float lateralMovementSpeed; // W/S moving
+    public float RotationSpeed; //Character is facing speed 
+    public float JumpForce; 
     public float Gravity = -9.81f;
 
-    //The platform radius the player will be moving around
-    public float platformRadius = 5f;
-    public Transform platformCenter;
 
-    private float _currentAngle = 0f;
+    //The platform radius the player will be moving around
+    public float platformRadius;
+    public float minForward;
+    public float maxBackward;
+    public Transform platformCenter;
+    public Transform mainCamera;
+
+    private float _currentRadius;
     private Vector3 _centerPosition;
     private float _rotationY; // For mouse rotation, not used in current implementation
     private float _verticalVelocity;
@@ -32,41 +37,79 @@ public class PlayerController : MonoBehaviour
             _centerPosition = Vector3.zero;
         }
 
-        Vector3 offset = transform.position - _centerPosition;
-        offset.y = 0; // Ignore vertical offset
+        if(mainCamera == null)
+        {
+            mainCamera = Camera.main.transform; // in case I forget to assign camera lol
+        }
 
-        _currentAngle = Mathf.Atan2(offset.z, offset.x) * Mathf.Rad2Deg;
+        Vector3 offset = transform.position - _centerPosition;
+        offset.y = 0;
+        _currentRadius = offset.magnitude;
     }
 
     public void Move(Vector2 movementVector)
     {
-        float horizontal = movementVector.x; //(W/A movement)
-        _currentAngle += horizontal * MovementSpeed * 10f * Time.deltaTime;
+        //Current player position
+        Vector3 currentOffset = transform.position - _centerPosition;
+        currentOffset.y = 0;
+        Vector3 tangentDirection = Vector3.Cross(Vector3.up, currentOffset).normalized;
+        Vector3 radialDirection = -currentOffset.normalized; //Current direction from center to player
 
-        float radian = _currentAngle * Mathf.Deg2Rad;
-        float targetX = _centerPosition.x + Mathf.Cos(radian) * platformRadius;
-        float targetZ = _centerPosition.z + Mathf.Sin(radian) * platformRadius;
+        //A/D to move around the platform
+        Vector3 lateralMove = -tangentDirection * movementVector.x * MovementSpeed * Time.deltaTime;
 
-        float currentY = transform.position.y;
+        // W/S to move closer/farther from center
+        _currentRadius -= movementVector.y * lateralMovementSpeed * Time.deltaTime;
+        _currentRadius = Mathf.Clamp(_currentRadius, minForward, maxBackward); // Clamp radius to avoid going too close or too far
 
+        _characterController.Move(lateralMove);
+
+        Vector3 newOffset = transform.position - _centerPosition;
+        newOffset.y = 0;
+
+
+        if(newOffset.magnitude > 0.01f)
+        {
+            newOffset = newOffset.normalized * _currentRadius;
+            Vector3 updatedPos = _centerPosition + newOffset;
+            updatedPos.y = transform.position.y; // Preserve the y position
+
+            Vector3 correction = updatedPos - transform.position;
+            correction.y = 0;
+            _characterController.Move(correction);
+        }
+
+
+        //gravity
         if (_characterController.isGrounded && _verticalVelocity < 0)
         {
-            _verticalVelocity = -2f; //allows to be on the ground
+            _verticalVelocity = -2f;
         }
 
         _verticalVelocity += Gravity * Time.deltaTime;
-        currentY += _verticalVelocity * Time.deltaTime;
+        _characterController.Move(new Vector3(0, _verticalVelocity, 0) * Time.deltaTime);
 
-        Vector3 newPosition = new Vector3(targetX, currentY, targetZ);
-
-        Vector3 movement = newPosition - transform.position;
-        _characterController.Move(movement);
-
-        //Allows the player to move towards where they are looking.
-        if (horizontal != 0)
+        if (mainCamera != null)
         {
-            transform.rotation = Quaternion.Euler(0, _currentAngle, 0);
-        } 
+            Vector3 lookDirection = mainCamera.position - transform.position;
+            lookDirection.y = 0;
+            if(lookDirection != Vector3.zero)
+            {
+                transform.rotation = Quaternion.LookRotation(lookDirection);
+            }
+        }
+
+        if (movementVector.magnitude > 0.1f) // Only when there is movement input
+        {
+            // Calculating the desired move direction based on input
+            Vector3 moveDirection = -tangentDirection * movementVector.x + radialDirection * (movementVector.y);
+            moveDirection.y = 0;
+
+            if (moveDirection.magnitude > 0.01f)
+            {
+                transform.rotation = Quaternion.LookRotation(moveDirection);
+            }
+        }
 
     }
     /*
