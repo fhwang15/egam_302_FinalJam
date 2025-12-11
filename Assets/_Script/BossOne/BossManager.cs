@@ -23,15 +23,32 @@ public class BossManager : MonoBehaviour
 {
     public Transform playerCharacter;
 
+    public List<Stitch> stitches = new List<Stitch>();
+    public int totalStitchCount = 0;
+
     public GameObject BossCharacter;
     private Vector3 BossForward;
     public Vector3 PlayerCharacter;
 
     //List of transforms that will record the position of the stitches
-    public List<Transform> StitchLocation;
+    ///public List<Transform> StitchLocation;
+
+    //Stakes
+    public GameObject stakePrefab;
+    public Transform[] stakeSpawnPoints; // Stake 생성 위치 (5개)
+
+    public List<Stake> stakes = new List<Stake>();
+    public int activeStakes = 0;
+    public float phase2Health = 300f;
+    public CoreShootingManager coreShootingManager;
+
+    public float[] coreExposureThresholds = { 0.75f, 0.60f, 0.45f, 0.30f };
+    private int currentThresholdIndex = 0;
+
+    private Dictionary<Stake, Coroutine> stakeRespawnCoroutines = new Dictionary<Stake, Coroutine>();
 
     //Enum (State of Phase One and Two)
-    BossState currentBossPhase = BossState.phaseOne;
+    public BossState currentBossPhase = BossState.phaseOne;
 
     //Enum (States of Detect/AOE1/AOE2/AOE3)
     PhaseOne currentPhase = PhaseOne.Detect;
@@ -40,6 +57,11 @@ public class BossManager : MonoBehaviour
     public float health;
 
     public float detectionCooldown = 2f;
+
+    //Boss Stuff
+    private Renderer _bossRenderer;
+    private Material _bossMaterial;
+    private Color _bossOriginalColor;
 
 
     //Smash
@@ -55,6 +77,22 @@ public class BossManager : MonoBehaviour
     void Start()
     {
         BossForward = BossCharacter.transform.forward;
+
+
+        totalStitchCount = stitches.Count;
+        Debug.Log($"Phase 1 시작! Stitch 개수: {totalStitchCount}");
+
+        _bossRenderer = BossCharacter.GetComponent<Renderer>();
+        if (_bossRenderer != null)
+        {
+            _bossMaterial = _bossRenderer.material;
+            _bossOriginalColor = _bossMaterial.color;
+        }
+        else
+        {
+            //   Debug.LogWarning("BossCharacter에 Renderer가 없습니다!");
+        }
+
     }
 
     // Update is called once per frame
@@ -65,8 +103,178 @@ public class BossManager : MonoBehaviour
         {
             UpdatePhaseOne();
         }
+        else if (currentBossPhase == BossState.phaseTwo)
+        {
+            UpdatePhaseTwo();
+        }
 
-       
+    }
+
+
+    public void RegisterStitch(Stitch stitch)
+    {
+        if (!stitches.Contains(stitch))
+        {
+            stitches.Add(stitch);
+            Debug.Log($"Stitch 등록됨: {stitch.gameObject.name}");
+        }
+    }
+
+    public void RegisterStake(Stake stake)
+    {
+        if (!stakes.Contains(stake))
+        {
+            stakes.Add(stake);
+            activeStakes++;
+            Debug.Log($"Stake 등록: {stake.gameObject.name}");
+        }
+    }
+
+
+
+    public void OnStitchDestroyed(Stitch stitch)
+    {
+        if (stitches.Contains(stitch))
+        {
+            stitches.Remove(stitch);
+            Debug.Log($"남은 Stitch: {stitches.Count}/{totalStitchCount}");
+
+            // 모든 Stitch 파괴됨 → Phase 2
+            if (stitches.Count == 0)
+            {
+                StartCoroutine(TransitionToPhaseTwo());
+            }
+        }
+    }
+    public void OnStakeDestroyed(Stake stake)
+    {
+        activeStakes--;
+        Debug.Log($"활성 Stake: {activeStakes}/5");
+    }
+
+    public void OnStakeRespawned(Stake stake)
+    {
+        activeStakes++;
+        Debug.Log($"Stake 재생성! 활성: {activeStakes}/5");
+    }
+
+    public void ScheduleStakeRespawn(Stake stake, float delay)
+    {
+        Coroutine coroutine = StartCoroutine(RespawnStakeAfterDelay(stake, delay));
+        stakeRespawnCoroutines[stake] = coroutine;
+    }
+
+    IEnumerator RespawnStakeAfterDelay(Stake stake, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        if (stake != null)
+        {
+            stake.Respawn();
+        }
+
+        stakeRespawnCoroutines.Remove(stake);
+    }
+
+
+    public void TakeDamagePhaseTwo(float baseDamage)
+    {
+        if (currentBossPhase != BossState.phaseTwo) return;
+
+        float damageReduction = activeStakes * 0.2f;
+        float actualDamage = baseDamage * (1f - damageReduction);
+
+        phase2Health -= actualDamage;
+        Debug.Log($"보스 데미지: {actualDamage} (감소: {damageReduction * 100}%) | 체력: {phase2Health}");
+
+        // 하얀색 깜빡이기 추가!
+        OnHit();
+
+        CheckCoreExposure();
+
+        if (phase2Health <= 0)
+        {
+            Die();
+        }
+    }
+
+    void CheckCoreExposure()
+    {
+        if (currentThresholdIndex >= coreExposureThresholds.Length) return;
+
+        float healthPercent = phase2Health / 300f; // 최대 체력 기준
+
+        if (healthPercent <= coreExposureThresholds[currentThresholdIndex])
+        {
+            Debug.Log($"코어 노출 구간 도달! ({healthPercent * 100}%)");
+            currentThresholdIndex++;
+
+            // 코어 쏘기 모드 시작
+            if (coreShootingManager != null)
+            {
+                HideBoss();
+                coreShootingManager.ActivateCoreMode();
+            }
+        }
+    }
+
+    public void OnCoreShootingSuccess()
+    {
+        Debug.Log("코어 공격 성공! 100 데미지!");
+        phase2Health -= 100f; // 큰 데미지
+
+        if (phase2Health <= 0)
+        {
+            Die();
+        }
+    }
+
+    public void OnCoreShootingFail()
+    {
+        phase2Health += 50f;
+        phase2Health = Mathf.Min(phase2Health, 300f); // 최대 체력 제한
+    }
+
+    IEnumerator TransitionToPhaseTwo()
+    {
+        Debug.Log("모든 Stitch 파괴! Phase 2로 전환!");
+        _isAttacking = true;
+
+        yield return new WaitForSeconds(2f);
+
+        currentBossPhase = BossState.phaseTwo;
+        currentPhase = PhaseOne.Detect; // Phase 2도 Detect부터 시작
+        _isAttacking = false;
+
+        Debug.Log("Phase 2 시작!");
+
+        SpawnStakes();
+    }
+
+    void SpawnStakes()
+    {
+        if (stakePrefab == null || stakeSpawnPoints == null || stakeSpawnPoints.Length == 0)
+        {
+            Debug.LogError("Stake Prefab 또는 Spawn Points가 설정되지 않았습니다!");
+            return;
+        }
+
+        Debug.Log($"{stakeSpawnPoints.Length}개의 Stake 생성!");
+
+        foreach (Transform spawnPoint in stakeSpawnPoints)
+        {
+            if (spawnPoint != null)
+            {
+                GameObject stakeObj = Instantiate(stakePrefab, spawnPoint.position, spawnPoint.rotation);
+                Stake stake = stakeObj.GetComponent<Stake>();
+
+                if (stake != null)
+                {
+                    // BossManager 자동 할당
+                    stake.bossManager = this;
+                }
+            }
+        }
     }
 
     public void UpdatePhaseOne()
@@ -77,7 +285,7 @@ public class BossManager : MonoBehaviour
                 Detect();
                 break;
             case PhaseOne.Smash:
-                if(!_isAttacking)
+                if (!_isAttacking)
                 {
                     StartCoroutine(Smash());
                     _isAttacking = true;
@@ -101,6 +309,11 @@ public class BossManager : MonoBehaviour
                 break;
         }
         // Handle Phase One specific logic here
+    }
+
+    public void UpdatePhaseTwo()
+    {
+
     }
 
     public void Detect()
@@ -191,7 +404,7 @@ public class BossManager : MonoBehaviour
         yield return new WaitForSeconds(2f);
     }
 
-    IEnumerator BlinkIndicator(GameObject indicator, float duration)
+    public IEnumerator BlinkIndicator(GameObject indicator, float duration)
     {
         float elapsed = 0f;
         Renderer renderer = indicator.GetComponent<Renderer>();
@@ -212,6 +425,48 @@ public class BossManager : MonoBehaviour
     public IEnumerator CoolDown()
     {
         yield return new WaitForSeconds(2f);
+    }
+
+
+    public void HideBoss()
+    {
+        if (_bossRenderer != null)
+        {
+            _bossRenderer.enabled = false;
+        }
+    }
+    public void ShowBoss()
+    {
+        if (_bossRenderer != null)
+        {
+            _bossRenderer.enabled = true;
+        }
+    }
+
+    public void OnHit()
+    {
+        if (_bossRenderer != null)
+        {
+            StartCoroutine(FlashWhite());
+        }
+    }
+    IEnumerator FlashWhite()
+    {
+        _bossMaterial.color = Color.white;
+        yield return new WaitForSeconds(0.1f);
+        _bossMaterial.color = _bossOriginalColor;
+    }
+
+
+
+    void Die()
+    {
+        Debug.Log("보스 사망!");
+
+        // 사망 이펙트, 애니메이션 등 (나중에 추가)
+
+        // 2초 후 파괴
+        Destroy(gameObject, 2f);
     }
 
 }

@@ -21,6 +21,7 @@ public class PlayerController : MonoBehaviour
     private Vector3 _centerPosition;
     private float _rotationY; // For mouse rotation, not used in current implementation
     private float _verticalVelocity;
+    private Quaternion _lastMoveRotation;
 
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -45,6 +46,8 @@ public class PlayerController : MonoBehaviour
         Vector3 offset = transform.position - _centerPosition;
         offset.y = 0;
         _currentRadius = offset.magnitude;
+
+        _lastMoveRotation = transform.rotation;
     }
 
     public void Move(Vector2 movementVector)
@@ -105,13 +108,22 @@ public class PlayerController : MonoBehaviour
             Vector3 moveDirection = -tangentDirection * movementVector.x + radialDirection * (movementVector.y);
             moveDirection.y = 0;
 
+           
+
             if (moveDirection.magnitude > 0.01f)
             {
-                transform.rotation = Quaternion.LookRotation(moveDirection);
+                Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
+                transform.rotation =targetRotation;
+                _lastMoveRotation = targetRotation;
             }
+        }
+        else
+        {
+            transform.rotation = _lastMoveRotation;
         }
 
     }
+
     /*
     public void Rotate(Vector2 rotationVector)
     {
