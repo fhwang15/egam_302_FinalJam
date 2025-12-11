@@ -78,6 +78,11 @@ public class Stake : MonoBehaviour
         {
             bossManager.ScheduleStakeRespawn(this, respawnTime);
         }
+
+        if (healthBar != null)
+        {
+            healthBar.gameObject.SetActive(false);
+        }
     }
 
     public void Respawn()
@@ -98,6 +103,12 @@ public class Stake : MonoBehaviour
         if (bossManager != null)
         {
             bossManager.OnStakeRespawned(this);
+        }
+
+        if (healthBar != null && healthBar.gameObject != null)
+        {
+            healthBar.gameObject.SetActive(true);
+            healthBar.SetHealth(health);
         }
     }
 

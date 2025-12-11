@@ -10,9 +10,16 @@ public class CameraController : MonoBehaviour
     public float cameraAngle; //angle offset
     public Vector3 offset;
 
+
+    private CameraShake cameraShake;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        cameraShake = GetComponent<CameraShake>();
+        if (cameraShake == null)
+        {
+            cameraShake = gameObject.AddComponent<CameraShake>();
+        }
     }
 
     void LateUpdate()
@@ -36,5 +43,10 @@ public class CameraController : MonoBehaviour
 
         // Camera will see the player
         transform.rotation = Quaternion.Euler(cameraAngle, xRotation, 0);
+
+        if (cameraShake != null)
+        {
+            cameraShake.UpdateOriginalPosition();
+        }
     }
 }

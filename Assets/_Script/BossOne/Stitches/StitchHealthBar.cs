@@ -24,6 +24,10 @@ public class StitchHealthBar : MonoBehaviour
             transform.LookAt(transform.position + mainCamera.transform.rotation * Vector3.forward,
                              mainCamera.transform.rotation * Vector3.up);
         }
+        if (mainCamera == null)
+        {
+            return;
+        }
     }
 
     public void SetMaxHealth(float maxHealth)

@@ -63,6 +63,8 @@ public class BossManager : MonoBehaviour
     private Material _bossMaterial;
     private Color _bossOriginalColor;
 
+    public BossHealthBar healthBar;
+
 
     //Smash
     public GameObject smashIndicatorPrefab; // Prefab for the smash indicator
@@ -243,10 +245,14 @@ public class BossManager : MonoBehaviour
         yield return new WaitForSeconds(2f);
 
         currentBossPhase = BossState.phaseTwo;
-        currentPhase = PhaseOne.Detect; // Phase 2도 Detect부터 시작
+        currentPhase = PhaseOne.Detect;
         _isAttacking = false;
 
         Debug.Log("Phase 2 시작!");
+        if (healthBar != null)
+        {
+            healthBar.Show();
+        }
 
         SpawnStakes();
     }
@@ -363,12 +369,9 @@ public class BossManager : MonoBehaviour
         Debug.Log("Smash Attack 준비!");
 
         Vector3 targetPosition = playerCharacter.position;
-        targetPosition.y = 1.13f; // 바닥 높이
+        targetPosition.y = 1.13f;
 
-        // Rotation을 X축 90도로 설정 (바닥에 평평하게)
         GameObject indicator = Instantiate(smashIndicatorPrefab, targetPosition, Quaternion.Euler(0, 90, 0));
-
-        // Scale은 Cylinder가 누워있는 상태 기준
         indicator.transform.localScale = new Vector3(smashRadius * 2, 2.3f, smashRadius * 2);
 
         StartCoroutine(BlinkIndicator(indicator, smashNoticeTime));
@@ -386,6 +389,31 @@ public class BossManager : MonoBehaviour
         if (distanceToPlayer <= smashRadius)
         {
             Debug.Log($"플레이어 맞음! 데미지: {smashDamage}");
+
+            // 카메라 흔들기!
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                CameraController camController = mainCam.GetComponent<CameraController>();
+                CameraShake shake = mainCam.GetComponent<CameraShake>();
+
+                if (shake != null)
+                {
+                    Debug.Log("카메라 흔들기 시작!");
+
+                    // CameraController 잠깐 끄기!
+                    if (camController != null)
+                    {
+                        camController.enabled = false;
+                    }
+
+                    // 흔들기
+                    shake.Shake(0.2f, 0.5f); // 0.5초, 강도 0.5
+
+                    // 0.5초 후 다시 켜기
+                    StartCoroutine(ReenableCameraController(camController, 0.5f));
+                }
+            }
         }
         else
         {
@@ -398,6 +426,16 @@ public class BossManager : MonoBehaviour
         currentPhase = PhaseOne.Detect;
     }
 
+    // 새 함수 추가!
+    IEnumerator ReenableCameraController(CameraController controller, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (controller != null)
+        {
+            controller.enabled = true;
+            Debug.Log("CameraController 다시 활성화!");
+        }
+    }
 
     public IEnumerator RoundAttack()
     {
@@ -463,9 +501,12 @@ public class BossManager : MonoBehaviour
     {
         Debug.Log("보스 사망!");
 
-        // 사망 이펙트, 애니메이션 등 (나중에 추가)
+        // 체력바 숨기기
+        if (healthBar != null)
+        {
+            healthBar.Hide();
+        }
 
-        // 2초 후 파괴
         Destroy(gameObject, 2f);
     }
 
