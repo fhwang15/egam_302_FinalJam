@@ -3,6 +3,7 @@ using NUnit.Framework;
 using System.Collections.Generic;
 using System.Collections;
 using UnityEngine;
+using Unity.VisualScripting;
 
 
 public enum BossState
@@ -508,6 +509,8 @@ public class BossManager : MonoBehaviour
         }
 
         Destroy(gameObject, 2f);
+            Application.Quit();
+        
     }
 
 }

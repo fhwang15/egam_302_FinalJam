@@ -102,7 +102,7 @@ public class Bullet : MonoBehaviour
 
         if (bossManager != null)
         {
-            bossManager.TakeDamagePhaseTwo(10f);
+            bossManager.TakeDamagePhaseTwo(5f);
         }
 
         if (stitch != null)
