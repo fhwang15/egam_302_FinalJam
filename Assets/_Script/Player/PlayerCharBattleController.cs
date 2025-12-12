@@ -1,8 +1,15 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 public class PlayerCharBattleController : MonoBehaviour
 {
     public int health;
+    public int maxPlayerHealth;
+
+    public Sprite emptyHeart;
+    public Sprite fullHeart;
+    public Image[] Hearts;
+
 
     public Transform bossLocation;
 
@@ -15,7 +22,8 @@ public class PlayerCharBattleController : MonoBehaviour
 
     private void Start()
     {
-        health = 10;
+        maxPlayerHealth = 10;
+        health = maxPlayerHealth;
     }
 
 
@@ -41,6 +49,17 @@ public class PlayerCharBattleController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        for(int i = 0; i < Hearts.Length; i++)
+        {
+            if (i < maxPlayerHealth)
+            {
+                Hearts[i].enabled = true;
+            }else
+            {
+                Hearts[i].enabled = false;
+            }
+        }
+
         if(Input.GetMouseButtonDown(0)) //Left Click
         {
             Shooting();
