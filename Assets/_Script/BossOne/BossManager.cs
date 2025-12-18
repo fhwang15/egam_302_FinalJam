@@ -16,7 +16,7 @@ public enum PhaseOne
     Detect,
     Smash,
     RoundAttack,
-    CornShooting,
+    Swish,
     Wind
 }
 
@@ -27,12 +27,24 @@ public class BossManager : MonoBehaviour
     public List<Stitch> stitches = new List<Stitch>();
     public int totalStitchCount = 0;
 
-    public GameObject BossCharacter;
-    private Vector3 BossForward;
     public Vector3 PlayerCharacter;
 
     //List of transforms that will record the position of the stitches
     ///public List<Transform> StitchLocation;
+
+    [Header("Boss Rotation Setting")]
+    //Boss Rotation towards the player character.
+    public GameObject BossCharacter;
+    private Vector3 BossForward;
+    public float rotationSpeed = 2f;
+    public bool rotateTowardsPlayer = true;
+
+    [Header("Enum: Detect Settings")]
+    public float detectDuration = 5f;
+    public float attackCooldown = 2f;
+    private float detectTimer = 0f;
+    private Vector3 targetAttackPosition;
+    private bool isDetecting = false;
 
     //Stakes
     public GameObject stakePrefab;
@@ -51,7 +63,7 @@ public class BossManager : MonoBehaviour
     //Enum (State of Phase One and Two)
     public BossState currentBossPhase = BossState.phaseOne;
 
-    //Enum (States of Detect/AOE1/AOE2/AOE3)
+    //Enum of attacks (States of Detect/AOE1/AOE2/AOE3)
     PhaseOne currentPhase = PhaseOne.Detect;
 
     //Health
@@ -91,10 +103,8 @@ public class BossManager : MonoBehaviour
             _bossMaterial = _bossRenderer.material;
             _bossOriginalColor = _bossMaterial.color;
         }
-        else
-        {
-            //   Debug.LogWarning("BossCharacter에 Renderer가 없습니다!");
-        }
+
+        currentPhase = PhaseOne.Detect;
 
     }
 
@@ -111,8 +121,26 @@ public class BossManager : MonoBehaviour
             UpdatePhaseTwo();
         }
 
+        //if the boss should rotate towards the player, and is not attacking at the moment (enum = detect)
+        if (currentPhase == PhaseOne.Detect && playerCharacter != null && rotateTowardsPlayer)
+        {
+            RotateTowardsPlayer();
+        }
+
     }
 
+
+    void RotateTowardsPlayer()
+    {
+        Vector3 directionToPlayer = playerCharacter.position - transform.position;
+        directionToPlayer.y = 0; // Y축 회전만
+
+        if (directionToPlayer.magnitude > 0.1f)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(directionToPlayer);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+        }
+    }
 
     public void RegisterStitch(Stitch stitch)
     {
@@ -284,6 +312,8 @@ public class BossManager : MonoBehaviour
         }
     }
 
+    ///////////The Attacks and Phases///////////
+
     public void UpdatePhaseOne()
     {
         switch (currentPhase)
@@ -306,7 +336,7 @@ public class BossManager : MonoBehaviour
                 }
                 break;
 
-            case PhaseOne.CornShooting:
+            case PhaseOne.Swish:
                 break;
             case PhaseOne.Wind:
 
@@ -325,49 +355,51 @@ public class BossManager : MonoBehaviour
 
     public void Detect()
     {
-        if (playerCharacter == null) return;
-        if (Time.time - _lastDetectionTime < detectionCooldown) return;
+        if (!isDetecting)
+        {
+            isDetecting = true;
+            detectTimer = 0f;
+        }
 
+        //Rotates towards player over time for 5 seconds
+        detectTimer += Time.deltaTime;
+
+        // After 5 seconds, store the player's position and choose an attack
+        if (detectTimer >= detectDuration)
+        {
+            targetAttackPosition = playerCharacter.position; 
+            isDetecting = false;
+            ChooseAttack(); 
+        }
+    }
+
+    void ChooseAttack()
+    {
         Vector3 bossForward = transform.forward;
-        Vector3 directionToPlayer = (playerCharacter.position - transform.position).normalized;
-        directionToPlayer.y = 0;
+        Vector3 directionToTarget = (targetAttackPosition - transform.position).normalized;
+        float dotProduct = Vector3.Dot(bossForward, directionToTarget);
 
-        currentPhase = PhaseOne.Smash;
-
-        /*
-        //Dot Product for Where boss is looking / Character position
-        float dotProduct = Vector3.Dot(bossForward, directionToPlayer);
-
-
+        // Dot Product로 공격 결정
         if (dotProduct < -0.3f)
         {
-            //if the dot product is negative == Round Attack
             currentPhase = PhaseOne.RoundAttack;
         }
         else if (dotProduct < 0.3f)
         {
-            //If the Dot Product is less than some amount, then it will be smach,
             currentPhase = PhaseOne.Smash;
         }
-        else if (dotProduct >= 0.3f)
+        else
         {
-            //if the dot product is large, CornShooting
-            currentPhase = PhaseOne.CornShooting;
+            currentPhase = PhaseOne.Swish;
         }
 
-        if (Random.value < 0.1f)
-        {
-            currentPhase = PhaseOne.Wind;
-        }
-
-        _lastDetectionTime = Time.time;
-        */
+        if (Random.value < 0.1f) currentPhase = PhaseOne.Wind;
     }
 
+    //Smash Attack Coroutine
     public IEnumerator Smash()
     {
         _isAttacking = true;
-        Debug.Log("Smash Attack 준비!");
 
         Vector3 targetPosition = playerCharacter.position;
         targetPosition.y = 1.13f;
@@ -379,7 +411,6 @@ public class BossManager : MonoBehaviour
 
         yield return new WaitForSeconds(smashNoticeTime);
 
-        Debug.Log("Smash Attack 실행!");
         Destroy(indicator);
 
         float distanceToPlayer = Vector3.Distance(
@@ -416,15 +447,152 @@ public class BossManager : MonoBehaviour
                 }
             }
         }
+
+        yield return new WaitForSeconds(attackCooldown);
+        _isAttacking = false;
+        currentPhase = PhaseOne.Detect;
+    }
+    
+    //Round Attack Coroutine
+    public IEnumerator RoundAttack()
+    {
+        yield return new WaitForSeconds(2f);
+        currentPhase = PhaseOne.Detect;
+    }
+
+    //Swish Attack Coroutine
+    public IEnumerator Swish()
+    {
+        _isAttacking = true;
+        Debug.Log("Swish Attack 준비!");
+
+        // 플랫폼 중심 (원의 중심)
+        Vector3 platformCenter = Vector3.zero; // 또는 실제 플랫폼 중심
+
+        // 타겟 위치 (플레이어가 있던 곳)
+        Vector3 targetPosition = targetAttackPosition;
+
+        // 중심에서 타겟으로의 방향 (반지름 방향)
+        Vector3 radialDirection = (targetPosition - platformCenter).normalized;
+        radialDirection.y = 0;
+
+        // 접선 방향 (원을 따라 회전한 방향)
+        Vector3 tangentDirection = Vector3.Cross(Vector3.up, radialDirection).normalized;
+
+        // 랜덤으로 왼쪽→오른쪽 또는 오른쪽→왼쪽
+        bool leftToRight = Random.value > 0.5f;
+        if (!leftToRight)
+        {
+            tangentDirection = -tangentDirection; // 방향 반전
+        }
+
+        Debug.Log($"Swish 방향: {(leftToRight ? "왼쪽→오른쪽" : "오른쪽→왼쪽")}");
+
+        // 원호 장판 생성 (반원 모양)
+        float arcRadius = 15f; // 원의 반지름
+        float arcWidth = 5f; // 장판 너비
+
+        GameObject swishIndicator = CreateSwishIndicator(platformCenter, radialDirection, tangentDirection, arcRadius, arcWidth);
+
+        StartCoroutine(BlinkIndicator(swishIndicator, smashNoticeTime));
+
+        yield return new WaitForSeconds(smashNoticeTime);
+
+        Debug.Log("Swish Attack 실행!");
+
+        // 플레이어가 장판 범위 안에 있는지 체크
+        bool playerHit = CheckPlayerInSwishZone(platformCenter, radialDirection, tangentDirection, arcRadius, arcWidth);
+
+        if (playerHit)
+        {
+            Debug.Log("플레이어 Swish 맞음!");
+
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                CameraShake shake = mainCam.GetComponent<CameraShake>();
+                if (shake != null)
+                {
+                    shake.Shake(0.5f, 0.5f);
+                }
+            }
+        }
         else
         {
-            Debug.Log("플레이어가 범위 밖으로 피함!");
+            Debug.Log("플레이어가 Swish 피함!");
         }
+
+        Destroy(swishIndicator);
 
         yield return new WaitForSeconds(0.5f);
 
+        Debug.Log($"공격 완료! {attackCooldown}초 쿨타임...");
+        yield return new WaitForSeconds(attackCooldown);
+
         _isAttacking = false;
         currentPhase = PhaseOne.Detect;
+        Debug.Log("쿨타임 종료, Detect 모드로 전환");
+    }
+
+
+    GameObject CreateSwishIndicator(Vector3 center, Vector3 radialDir, Vector3 tangentDir, float radius, float width)
+    {
+        // 반원 장판 만들기
+        GameObject indicator = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        Destroy(indicator.GetComponent<Collider>()); // Collider 제거
+
+        // 반투명 빨간색 Material
+        Renderer renderer = indicator.GetComponent<Renderer>();
+        Material mat = new Material(Shader.Find("Unlit/Color"));
+        mat.color = new Color(1f, 0f, 0f, 0.5f); // 빨간색 반투명
+        renderer.material = mat;
+
+        // 타겟 위치 (반지름 방향으로 이동)
+        Vector3 targetPos = center + radialDir * radius;
+        targetPos.y = 1.13f;
+
+        // 위치 설정 (원의 반 정도 위치)
+        indicator.transform.position = targetPos;
+
+        // 회전: 접선 방향으로 늘어나도록
+        indicator.transform.rotation = Quaternion.LookRotation(Vector3.up, tangentDir);
+
+        // 크기: 반원처럼 넓게
+        indicator.transform.localScale = new Vector3(radius * 1.5f, width, 1f);
+
+        return indicator;
+    }
+
+    bool CheckPlayerInSwishZone(Vector3 center, Vector3 radialDir, Vector3 tangentDir, float radius, float width)
+    {
+        if (playerCharacter == null) return false;
+
+        Vector3 playerPos = playerCharacter.position;
+        playerPos.y = 0;
+
+        Vector3 centerFlat = center;
+        centerFlat.y = 0;
+
+        // 플레이어가 타겟 쪽 반원 안에 있는지 체크
+        Vector3 toPlayer = playerPos - centerFlat;
+
+        // 1. 반지름 체크
+        float distanceFromCenter = toPlayer.magnitude;
+        if (distanceFromCenter > radius + width || distanceFromCenter < radius - width)
+        {
+            return false; // 너무 멀거나 가까움
+        }
+
+        // 2. 각도 체크 (타겟 방향 ±90도 범위)
+        float angleToPlayer = Vector3.SignedAngle(radialDir, toPlayer.normalized, Vector3.up);
+
+        // 반원 범위 (-90도 ~ +90도)
+        if (Mathf.Abs(angleToPlayer) <= 90f)
+        {
+            return true;
+        }
+
+        return false;
     }
 
     // 새 함수 추가!
@@ -438,10 +606,8 @@ public class BossManager : MonoBehaviour
         }
     }
 
-    public IEnumerator RoundAttack()
-    {
-        yield return new WaitForSeconds(2f);
-    }
+
+
 
     public IEnumerator BlinkIndicator(GameObject indicator, float duration)
     {
