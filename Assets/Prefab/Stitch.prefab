@@ -127,7 +127,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 11bc9f98776ccaf4e9ed1fe64f74d06c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Stitch
-  maxHealth: 30
+  maxHealth: 200
   health: 0
   bossManager: {fileID: 0}
   healthBar: {fileID: 7689685060911094745}

@@ -1,9 +1,9 @@
-using Mono.Cecil.Cil;
 using NUnit.Framework;
 using System.Collections.Generic;
 using System.Collections;
 using UnityEngine;
 using Unity.VisualScripting;
+using TMPro;
 
 
 public enum BossState
@@ -51,6 +51,7 @@ public class BossManager : MonoBehaviour
 
     [Header("Enum: Smash Attack Settings")]
     public GameObject smashIndicatorPrefab; // Prefab for the smash indicator
+    public GameObject smashvfxPrefab;
     public float smashRadius = 3f; //Radius for now, maybe turn into square?
     public float smashDamage = 20f; // will turn into just # of hit
     public float smashNoticeTime = 2f; //2 seconds notice time before smash
@@ -83,11 +84,11 @@ public class BossManager : MonoBehaviour
 
     [Header("Stakes")]
     public GameObject stakePrefab;
-    public Transform[] stakeSpawnPoints; // Stake 생성 위치 (5개)
+    public Transform[] stakeSpawnPoints; // Stake 생성 위치 (6개)
     public List<Stake> stakes = new List<Stake>();
     public int activeStakes = 0;
 
-    public float phase2Health = 300f;
+    public float phase2Health = 2500f;
     public CoreShootingManager coreShootingManager;
 
     public float[] coreExposureThresholds = { 0.75f, 0.60f, 0.45f, 0.30f };
@@ -100,9 +101,6 @@ public class BossManager : MonoBehaviour
 
     //Enum of attacks (States of Detect/AOE1/AOE2/AOE3)
     public PhaseOne currentPhase = PhaseOne.Detect;
-
-    //Health
-    public float health;
 
     public float detectionCooldown = 2f;
 
@@ -122,11 +120,17 @@ public class BossManager : MonoBehaviour
     public AudioClip attackSound; // 공격음
     private AudioSource sfxSource;
 
+    public GameObject UIPanel;
+    public TextMeshProUGUI EndText;
+
+    public GameObject BearPrefab;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         BossForward = BossCharacter.transform.forward;
 
+        UIPanel.SetActive(false);
 
         totalStitchCount = stitches.Count;
         Debug.Log($"Phase 1 시작! Stitch 개수: {totalStitchCount}");
@@ -143,6 +147,12 @@ public class BossManager : MonoBehaviour
         musicSource.volume = 0.5f;
 
         PlayPhase1Music();
+
+
+        sfxSource = gameObject.AddComponent<AudioSource>();
+        sfxSource.loop = false;
+        sfxSource.playOnAwake = false;
+        sfxSource.volume = 0.7f;
 
         currentPhase = PhaseOne.Detect;
 
@@ -169,7 +179,7 @@ public class BossManager : MonoBehaviour
 
     }
 
-    ////Music////
+    ////Music and Sound////
     void PlayPhase1Music()
 {
     if (phase1Music != null && musicSource != null)
@@ -187,6 +197,23 @@ public class BossManager : MonoBehaviour
             musicSource.clip = phase2Music;
             musicSource.Play();
             Debug.Log("Phase 2 음악 재생");
+        }
+    }
+
+    void PlayWarningSound(AudioClip clip)
+    {
+        if (warningSound != null && sfxSource != null)
+        {
+            StartCoroutine(PlayClipForTime(clip, 1f));
+            
+        }
+    }
+
+    void PlayAttackSound()
+    {
+        if (attackSound != null && sfxSource != null)
+        {
+            sfxSource.PlayOneShot(attackSound);
         }
     }
 
@@ -275,13 +302,13 @@ public class BossManager : MonoBehaviour
     public void OnStakeDestroyed(Stake stake)
     {
         activeStakes--;
-        Debug.Log($"활성 Stake: {activeStakes}/5");
+        Debug.Log($"활성 Stake: {activeStakes}/6");
     }
 
     public void OnStakeRespawned(Stake stake)
     {
         activeStakes++;
-        Debug.Log($"Stake 재생성! 활성: {activeStakes}/5");
+        Debug.Log($"Stake 재생성! 활성: {activeStakes}/6");
     }
 
     public void ScheduleStakeRespawn(Stake stake, float delay)
@@ -307,7 +334,7 @@ public class BossManager : MonoBehaviour
     {
         if (currentBossPhase != BossState.phaseTwo) return;
 
-        float damageReduction = activeStakes * 0.2f;
+        float damageReduction = activeStakes * 0.1f;
         float actualDamage = baseDamage * (1f - damageReduction);
 
         phase2Health -= actualDamage;
@@ -328,7 +355,7 @@ public class BossManager : MonoBehaviour
     {
         if (currentThresholdIndex >= coreExposureThresholds.Length) return;
 
-        float healthPercent = phase2Health / 300f; // 최대 체력 기준
+        float healthPercent = phase2Health / 2500f; // 최대 체력 기준
 
         if (healthPercent <= coreExposureThresholds[currentThresholdIndex])
         {
@@ -346,8 +373,7 @@ public class BossManager : MonoBehaviour
 
     public void OnCoreShootingSuccess()
     {
-        Debug.Log("코어 공격 성공! 100 데미지!");
-        phase2Health -= 100f; // 큰 데미지
+        phase2Health -= 200f; // 큰 데미지
 
         if (phase2Health <= 0)
         {
@@ -358,7 +384,7 @@ public class BossManager : MonoBehaviour
     public void OnCoreShootingFail()
     {
         phase2Health += 50f;
-        phase2Health = Mathf.Min(phase2Health, 300f); // 최대 체력 제한
+        phase2Health = Mathf.Min(phase2Health, 2500f); // 최대 체력 제한
     }
 
     IEnumerator TransitionToPhaseTwo()
@@ -398,7 +424,7 @@ public class BossManager : MonoBehaviour
         if (roundAttackVFXPrefab != null)
         {
             GameObject vfx = Instantiate(phaseTwoTransitionVFX, transform.position, Quaternion.identity);
-            vfx.transform.localScale = Vector3.one * 3f;
+            vfx.transform.localScale = Vector3.one * 30f;
             Destroy(vfx, 3f);
         }
 
@@ -597,10 +623,27 @@ public class BossManager : MonoBehaviour
 
         GameObject indicator = Instantiate(smashIndicatorPrefab, targetPosition, Quaternion.Euler(0, 90, 0));
         indicator.transform.localScale = new Vector3(smashRadius * 2, 2.3f, smashRadius * 2);
+        PlayWarningSound(warningSound);
+
 
         yield return new WaitForSeconds(smashNoticeTime);
+        
+        if (smashvfxPrefab != null)
+        {
+            Vector3 vfxPos = targetPosition;
+            vfxPos.y = 1.13f;
 
+            GameObject warningVFX = Instantiate(roundAttackVFXPrefab, vfxPos, Quaternion.identity);
+            warningVFX.transform.localScale = new Vector3(3f, 5f, 3f);
+
+
+            Destroy(warningVFX, roundAttackWarningTime + 0.5f);
+        }
+        PlayAttackSound();
         Destroy(indicator);
+
+
+
 
         float distanceToPlayer = Vector3.Distance(
             new Vector3(playerCharacter.position.x, 0, playerCharacter.position.z),
@@ -655,16 +698,7 @@ public class BossManager : MonoBehaviour
 
 
 
-        if (roundAttackVFXPrefab != null)
-        {
-            Vector3 vfxPos = transform.position;
-            vfxPos.y = 1.5f;
-
-            GameObject warningVFX = Instantiate(roundAttackVFXPrefab, vfxPos, Quaternion.identity);
-            warningVFX.transform.localScale = Vector3.one * 30f;
-
-            Destroy(warningVFX, roundAttackWarningTime + 0.5f);
-        }
+        PlayWarningSound(warningSound);
 
         yield return new WaitForSeconds(roundAttackWarningTime);
 
@@ -675,9 +709,19 @@ public class BossManager : MonoBehaviour
         yield return new WaitForSeconds(1f);
         Destroy(warningCircle);
 
+        if (roundAttackVFXPrefab != null)
+        {
+            Vector3 vfxPos = transform.position;
+            vfxPos.y = 1.5f;
+
+            GameObject warningVFX = Instantiate(roundAttackVFXPrefab, vfxPos, Quaternion.identity);
+            warningVFX.transform.localScale = Vector3.one * 30f;
+
+            Destroy(warningVFX, roundAttackWarningTime + 0.5f);
+        }
         // 구체 발사!
         SpawnAttackOrbs();
-
+        PlayAttackSound();
         yield return new WaitForSeconds(2f);
         yield return new WaitForSeconds(attackCooldown);
 
@@ -780,12 +824,14 @@ public class BossManager : MonoBehaviour
         {
             Destroy(col);
         }
+        PlayWarningSound(warningSound);
 
         StartCoroutine(HighlightSafePlatforms(smashNoticeTime));
 
         yield return new WaitForSeconds(smashNoticeTime);
 
         Debug.Log("Swish Attack 실행!");
+        PlayAttackSound();
         Destroy(warningIndicator);
 
         // VFX 생성
@@ -967,6 +1013,9 @@ public class BossManager : MonoBehaviour
             GameObject indicator = Instantiate(meteorIndicatorPrefab, targetPos, Quaternion.Euler(0, 0, 0));
             indicator.transform.localScale = new Vector3(5f, 0.2f, 5f);
 
+            PlayWarningSound(warningSound);
+
+
             // 3. 메테오 Orb (위에서 떨어짐)
             Vector3 meteorStartPos = targetPos;
             meteorStartPos.y = meteorSpawnHeight; // 15m 위
@@ -1046,17 +1095,11 @@ public class BossManager : MonoBehaviour
 
     public void HideBoss()
     {
-        if (_bossRenderer != null)
-        {
-            _bossRenderer.enabled = false;
-        }
+        BearPrefab.SetActive(false);
     }
     public void ShowBoss()
     {
-        if (_bossRenderer != null)
-        {
-            _bossRenderer.enabled = true;
-        }
+        BearPrefab.SetActive(true);
     }
 
     public void OnHit()
@@ -1092,17 +1135,65 @@ public class BossManager : MonoBehaviour
 
     void Die()
     {
-        Debug.Log("보스 사망!");
-
-        // 체력바 숨기기
         if (healthBar != null)
         {
             healthBar.Hide();
         }
 
         Destroy(gameObject, 2f);
-        Application.Quit();
+        StartCoroutine(deathScene());
 
+    }
+
+    IEnumerator deathScene()
+    {
+        StartCoroutine(FadeOutMusic(1f));
+
+        Camera mainCam = Camera.main;
+        if (mainCam != null)
+        {
+            CameraController camController = mainCam.GetComponent<CameraController>();
+            CameraShake shake = mainCam.GetComponent<CameraShake>();
+
+            if (shake != null)
+            {
+                Debug.Log("카메라 흔들기 시작!");
+
+                // CameraController 잠깐 끄기!
+                if (camController != null)
+                {
+                    camController.enabled = false;
+                }
+
+                // 흔들기
+                shake.Shake(2f, 3f); // 0.5초, 강도 0.5
+
+                StartCoroutine(ReenableCameraController(camController, 3f));
+            }
+
+            yield return new WaitForSeconds(5f);
+
+            UIPanel.SetActive(true);
+            EndText.text = "You Have Defeated the Stitching Horror!";
+        }
+
+        // VFX
+        if (roundAttackVFXPrefab != null)
+        {
+            GameObject vfx = Instantiate(phaseTwoTransitionVFX, transform.position, Quaternion.identity);
+            vfx.transform.localScale = Vector3.one * 30f;
+            Destroy(vfx);
+        }
+
+        yield return new WaitForSeconds(3f);
+    }
+
+    IEnumerator PlayClipForTime(AudioClip clip, float duration)
+    {
+        sfxSource.clip = clip;
+        sfxSource.Play();
+        yield return new WaitForSeconds(duration);
+        sfxSource.Stop();
     }
 
 }

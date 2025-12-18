@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 
 public class PlayerCharBattleController : MonoBehaviour
 {
@@ -31,6 +32,8 @@ public class PlayerCharBattleController : MonoBehaviour
     public GameObject BulletPrefab;
     public float bulletSpeed;
 
+    public GameObject GameOverUI;
+    public TextMeshProUGUI gameoverText;
     //Whenever Player Clicks, they will instantiate bullet.
 
     private void Start()
@@ -166,8 +169,8 @@ public class PlayerCharBattleController : MonoBehaviour
         Debug.Log("플레이어 사망!");
 
         // 게임 오버 처리
-        // Time.timeScale = 0f; // 일시정지
-        // GameOverUI.SetActive(true);
+        Time.timeScale = 0f; // 일시정지
+        GameOverUI.SetActive(true);
     }
 
 }
