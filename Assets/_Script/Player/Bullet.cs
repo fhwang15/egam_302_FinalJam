@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class Bullet : MonoBehaviour
 {
@@ -11,7 +12,29 @@ public class Bullet : MonoBehaviour
     private bool _hasHit = false;
     public Transform platformCenter;
 
+    private LineRenderer lineRenderer;
 
+    private void Start()
+    {
+
+        lineRenderer = gameObject.AddComponent<LineRenderer>();
+        lineRenderer.startWidth = 0.05f;
+        lineRenderer.endWidth = 0.05f;
+        lineRenderer.material = new Material(Shader.Find("Unlit/Color"));
+        lineRenderer.material.color = Color.red;
+        lineRenderer.positionCount = 2;
+    }
+
+    public void Initialize(Vector3 direction, float speed)
+    {
+
+        _direction = direction.normalized;
+        _speed = speed;
+
+        transform.rotation = Quaternion.LookRotation(_direction);
+
+        StartCoroutine(FlyShoot());
+    }
     // Update is called once per frame
     void Update()
     {
@@ -74,16 +97,7 @@ public class Bullet : MonoBehaviour
     }
 
 
-    public void Initialize(Vector3 direction, float speed)
-    {
-
-        _direction = direction.normalized;
-        _speed = speed;
-
-        transform.rotation = Quaternion.LookRotation(_direction);
-
-        StartCoroutine(FlyShoot());
-    }
+   
 
     void OnHit(RaycastHit hit)
     {

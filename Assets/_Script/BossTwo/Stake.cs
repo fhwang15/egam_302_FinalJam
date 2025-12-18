@@ -14,6 +14,16 @@ public class Stake : MonoBehaviour
     private Color _originalColor;
     private Vector3 _spawnPosition;
 
+    [Header("Round Attack")]
+    public GameObject attackOrbPrefab; // BossManager의 Orb 사용
+    public int orbCount = 8; // Stake는 8개 (보스보다 적게)
+    public float orbSpeed = 4f; // 조금 느리게
+    public float orbDamage = 1f;
+    public float orbLifetime = 5f;
+    public float attackInterval = 8f; // 8초마다 공격
+    public float firstAttackDelay = 3f; // 첫 공격 딜레이
+
+
     void Start()
     {
         health = maxHealth;
