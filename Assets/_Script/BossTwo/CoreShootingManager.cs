@@ -265,6 +265,7 @@ public class CoreShootingManager : MonoBehaviour
         {
             bossManager.ShowBoss();
             bossManager.OnCoreShootingSuccess();
+            bossManager.currentPhase = PhaseOne.Detect;
         }
     }
 
@@ -278,6 +279,7 @@ public class CoreShootingManager : MonoBehaviour
         {
             bossManager.ShowBoss();
             bossManager.OnCoreShootingFail();
+            bossManager.currentPhase = PhaseOne.Detect;
         }
     }
 

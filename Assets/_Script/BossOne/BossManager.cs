@@ -17,7 +17,8 @@ public enum PhaseOne
     Smash,
     RoundAttack,
     Swish,
-    MeteorAttack
+    MeteorAttack,
+    Idle
 }
 
 public class BossManager : MonoBehaviour
@@ -367,6 +368,7 @@ public class BossManager : MonoBehaviour
             {
                 HideBoss();
                 coreShootingManager.ActivateCoreMode();
+                currentPhase = PhaseOne.Idle;
             }
         }
     }
@@ -508,6 +510,14 @@ public class BossManager : MonoBehaviour
                     _isAttacking = true;
                 }
                 break;
+
+            case PhaseOne.Idle:
+                if (!_isAttacking)
+                {
+                    currentPhase = PhaseOne.Detect;
+                    _isAttacking = true;
+                }
+                break;
             default:
 
                 break;
@@ -554,6 +564,12 @@ public class BossManager : MonoBehaviour
                         _isAttacking = true;
                     }
                 
+                break;
+            case PhaseOne.Idle:
+                if (!_isAttacking)
+                {
+                    
+                }
                 break;
             default:
                 break;
